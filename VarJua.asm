@@ -1,4 +1,4 @@
-; Este es un programa machote para un .COM               
+      
 include vjmacros.ASM
 
 todo segment
@@ -427,6 +427,8 @@ todo segment
         ret
     pPentagon endP
 
+    ; D: Dibuja un hexagono
+    ; N: No hace validaciones de posiciones
     pHexagon proc
         push ax
 
@@ -690,7 +692,7 @@ todo segment
 
         pMoverCursor_key_pressed:
         call pCorregirPos
-        
+
         call pGetPixelColor
         mov saved, al
 
@@ -768,8 +770,11 @@ todo segment
             movV toolSelected, COD_PENTAGON
             jmp pFKeys_fclear
         pFKeys_f9:
-            jmpifn ah, F9_KEY, pFKeys_fend
+            jmpifn ah, F9_KEY, pFKeys_f10
             movV toolSelected, COD_HEXAGON
+        pFKeys_f10:
+            jmpifn ah, F10_KEY, pFKeys_fend
+            movV toolSelected, COD_FREE
         
         pFKeys_fclear:
             movV x0, -1
@@ -783,10 +788,129 @@ todo segment
         ret
     pFKeys endP
 
+    ; S: BX - Indicador de que entro
+    ; D: Determina que hacer si se presiono
+    ;    un evento sobre la barra de herramientas
+    pToolBarController proc
+        push ax
+
+        ; Se evita que este evento se dispare sobre
+        ; el canvas
+        mov bx, 00h
+        mov ax, cursorX
+        jmpifg ax, LIM_DIBUJO, pToolBarController_not
+            mov ax, cursorY
+
+            ; Se ignora el primer espacio en blanco
+            jmpifl ax, 15, pToolBarController_end
+
+            jmpifg ax, 30, pToolBarController_blue
+                mov cursorColor, black
+                jmp pToolBarController_end
+            pToolBarController_blue:
+            jmpifg ax, 45, pToolBarController_green
+                mov cursorColor, blue
+                jmp pToolBarController_end
+            pToolBarController_green:
+            jmpifg ax, 60, pToolBarController_cyan
+                mov cursorColor, green
+                jmp pToolBarController_end
+            pToolBarController_cyan:
+            jmpifg ax, 75, pToolBarController_red
+                mov cursorColor, cyan
+                jmp pToolBarController_end
+            pToolBarController_red:
+            jmpifg ax, 90, pToolBarController_magenta
+                mov cursorColor, red
+                jmp pToolBarController_end
+            pToolBarController_magenta:
+            jmpifg ax, 105, pToolBarController_orange
+                mov cursorColor, magenta
+                jmp pToolBarController_end
+            pToolBarController_orange:
+            jmpifg ax, 125, pToolBarController_yellow
+                mov cursorColor, orange
+                jmp pToolBarController_end
+            pToolBarController_yellow:
+            jmpifg ax, 141, pToolBarController_white
+                mov cursorColor, yellow
+                jmp pToolBarController_end
+            pToolBarController_white:
+            jmpifg ax, 156, pToolBarController_none
+                mov cursorColor, white
+                jmp pToolBarController_end
+            pToolBarController_none:
+            jmpifg ax, 171, pToolBarController_pixel
+                jmp pToolBarController_end
+            pToolBarController_pixel:
+            jmpifg ax, 186, pToolBarController_line
+                mov toolSelected, COD_PIXEL
+                jmp pToolBarController_end
+            pToolBarController_line:
+            jmpifg ax, 201, pToolBarController_iso
+                mov toolSelected, COD_LINE
+                jmp pToolBarController_end
+            pToolBarController_iso:
+            jmpifg ax, 216, pToolBarController_equi
+                mov toolSelected, COD_ISOSCELES
+                jmp pToolBarController_end
+            pToolBarController_equi:
+            jmpifg ax, 231, pToolBarController_esc
+                mov toolSelected, COD_EQUILATERO
+                jmp pToolBarController_end
+            pToolBarController_esc:
+            jmpifg ax, 246, pToolBarController_rect
+                mov toolSelected, COD_SCALENE
+                jmp pToolBarController_end
+            pToolBarController_rect:
+            jmpifg ax, 270, pToolBarController_sqr
+                mov toolSelected, COD_RECTANGLE
+                jmp pToolBarController_end
+            pToolBarController_sqr:
+            jmpifg ax, 285, pToolBarController_hex
+                mov toolSelected, COD_SQUARE
+                jmp pToolBarController_end
+            pToolBarController_hex:
+            jmpifg ax, 300, pToolBarController_pent
+                mov toolSelected, COD_HEXAGON
+                jmp pToolBarController_end
+            pToolBarController_pent:
+            jmpifg ax, 315, pToolBarController_free
+                mov toolSelected, COD_PENTAGON
+                jmp pToolBarController_end
+            pToolBarController_free:
+            jmpifg ax, 330, pToolBarController_end
+                mov toolSelected, COD_FREE
+                jmp pToolBarController_end
+        
+        pToolBarController_end:
+            movV x0, -1
+            movV y0, -1
+            movV x1, -1
+            movV y1, -1
+            movV x2, -1
+            movV y2, -1
+            mov bx, 01h
+        pToolBarController_not:
+
+        pop ax
+
+        ret 
+    pToolBarController endP
+
     ; E: AH - Scan Code
     ; D: Se encarga de decidir que hacer
     ;    con los eventos de teclado
     pController proc
+        push bx
+        ; Se evita que pinte sobre la barra de
+        ; herramientas
+        mov bx, cursorX
+        jmpifg ax, LIM_DIBUJO, pController_go
+        jmp pController_end
+        pController_go:
+
+        ; Aqui decide si pintar
         jmpifn toolSelected, COD_PIXEL, pController_line
             call pDrawPoint
             jmp pController_end
@@ -819,10 +943,16 @@ todo segment
             call pDrawPentagon
             jmp pController_end
         pController_hexagon:
-        jmpifn toolSelected, COD_HEXAGON, pController_end
+        jmpifn toolSelected, COD_HEXAGON, pController_free
             call pDrawHexagon
             jmp pController_end
+        pController_free:
+        jmpifn toolSelected, COD_FREE, pController_end
+            call pPolygon
+            jmp pController_end
         pController_end:
+
+        pop bx
 
         ret
     pController endP
@@ -1472,7 +1602,7 @@ todo segment
     pPolygon proc
         push ax
 
-        jmpifn ah, 1Ch, pPolygon_nenter
+        jmpifn ah, ENTER_KEY, pPolygon_nenter
             movV x1, -1
             movV y1, -1
             movV x0, -1
@@ -1622,7 +1752,10 @@ todo segment
             jmpif ah, SPACE_BAR, pRun_event_ok
             jmpifn ah, ENTER_KEY, pRun_end_event
             pRun_event_ok:
+            call pToolBarController
+            jmpif bx, 01h, pRun_ok
             call pController
+
             jmp pRun_ok
 
             ; -----------------------------
