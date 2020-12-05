@@ -6,3 +6,5 @@ Author: Juan Jose Vargas Fletes.
 If you're from the Costa Rica TEC in Kirstein's class... Please, do not try to use this repo... he'll know...
 
 Of course you can take ideas from this one.
+
+![alt paint](https://i.imgur.com/t0Di0e9.png)
